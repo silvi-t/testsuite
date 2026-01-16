@@ -103,6 +103,7 @@ def spicedb_query(spicedb, spicedb_route, schema_config, relationship_config):  
     Prepares a test schema and sample relationships in SpiceDB for authorization tests.
     Checks if the relationships are ready for authorization in SpiceDB.
     """
+    spicedb.client.spicedb_wait_for_ready()
     spicedb.client.create_schema(schema_config)
     spicedb.client.create_relationship(relationship_config)
     spicedb.client.wait_for_relationship(schema_config, relationship_config)

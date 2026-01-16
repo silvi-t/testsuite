@@ -73,6 +73,25 @@ class SpiceDBClient:
             timeout=30.0,
         )
 
+    @backoff.on_predicate(
+        backoff.constant,
+        lambda x: x is False,
+        max_tries=5,
+        interval=5,
+        jitter=None,
+        on_giveup=lambda details: (_ for _ in ()).throw(
+            TimeoutError(f"SpiceDB not ready after {details['tries']} tries.")
+        ),
+    )
+    def spicedb_wait_for_ready(self):
+        """
+        Check if SpiceDB is ready to accept requests.
+        Returns True if ready, False otherwise.
+        """
+
+        response = self.client.post("/v1/relationships/read", json={})
+        return response.status_code != 503
+
     def create_schema(self, schema_config: SchemaConfig):
         """
         Write a schema defining objects, roles, and permissions in SpiceDB via HTTP API.
@@ -144,7 +163,7 @@ class SpiceDBClient:
         interval=5,
         jitter=None,
         on_giveup=lambda details: (_ for _ in ()).throw(
-            TimeoutError(f"SpiceDB relationships not ready after {details['tries']} tries. ")
+            TimeoutError(f"SpiceDB relationships not ready after {details['tries']} tries.")
         ),
     )
     def wait_for_relationship(self, schema_config: SchemaConfig, relationship_config: RelationshipConfig):
