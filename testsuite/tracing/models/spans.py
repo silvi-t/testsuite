@@ -1,6 +1,5 @@
 """Span-related data models for distributed tracing"""
 
-import json
 from dataclasses import dataclass
 from typing import Any
 
@@ -15,14 +14,6 @@ class SpanReference:
     trace_id: str
     span_id: str
 
-    @classmethod
-    def from_dict(cls, data: dict) -> "SpanReference":
-        """Create SpanReference from Jaeger API response dict"""
-        return cls(
-            ref_type=data.get("refType", ""),
-            trace_id=data.get("traceID", ""),
-            span_id=data.get("spanID", ""),
-        )
 
 
 @dataclass(frozen=True)
@@ -38,57 +29,6 @@ class Span:  # pylint: disable=too-many-instance-attributes
     events: list[LogEntry]
     references: list[SpanReference]
     process_id: str
-
-    @classmethod
-    def from_dict(cls, data: dict):
-        """Create Span from Jaeger API response dict"""
-        # Convert tags list to dict, parsing JSON strings into Python objects
-        # Note: If duplicate keys exist, we keep the first occurrence
-        attrs_dict = {}
-        for tag in data.get("tags", []):
-            key = tag.get("key", "").strip()
-            if not key:  # Skip malformed tags without keys or whitespace-only keys
-                continue
-
-            # Skip duplicate keys - keep first occurrence
-            if key in attrs_dict:
-                continue
-
-            value = tag.get("value", "")
-
-            # Try to parse JSON strings (arrays/objects) into Python objects
-            if isinstance(value, str):
-                stripped = value.strip()
-                if stripped.startswith("[") or stripped.startswith("{"):
-                    try:
-                        value = json.loads(stripped)
-                    except json.JSONDecodeError:
-                        pass  # Keep as string if not valid JSON
-
-            attrs_dict[key] = value
-
-        # Convert logs list to LogEntry objects
-        logs = [LogEntry.from_dict(log_data) for log_data in data.get("logs", [])]
-
-        # Convert references list to SpanReference objects
-        references = [SpanReference.from_dict(ref_data) for ref_data in data.get("references", [])]
-
-        duration = data.get("duration", 0)
-        # Negative durations don't make sense, but we don't fail on them
-        # to be defensive against potentially malformed trace data
-        duration = max(duration, 0)
-
-        return cls(
-            name=data.get("operationName", ""),
-            span_id=data.get("spanID", ""),
-            trace_id=data.get("traceID", ""),
-            start_time=data.get("startTime", 0),
-            duration=duration,
-            attributes=attrs_dict,
-            events=logs,
-            references=references,
-            process_id=data.get("processID", ""),
-        )
 
     def get_attribute(self, key: str, default=None) -> Any:
         """Get attribute value by key"""

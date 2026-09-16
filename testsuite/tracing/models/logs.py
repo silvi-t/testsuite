@@ -55,17 +55,6 @@ class LogEntry:
     fields: list[LogField]
 
     @classmethod
-    def from_dict(cls, data: dict) -> "LogEntry":
-        """Create LogEntry from Jaeger v1 API response dict"""
-        fields = []
-        for f in data.get("fields", []):
-            key = f.get("key", "").strip()
-            if not key:
-                continue
-            fields.append(LogField(key=key, value=f.get("value", ""), type=f.get("type", "string")))
-        return cls(timestamp=data.get("timestamp", 0), fields=fields)
-
-    @classmethod
     def from_otlp(cls, event_data: dict) -> "LogEntry":
         """Create LogEntry from OTLP event dict"""
         fields = [LogField(key="event", value=event_data.get("name", ""), type="string")]

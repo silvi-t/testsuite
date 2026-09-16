@@ -20,16 +20,6 @@ class Trace:
     spans: list[Span]
     processes: dict[str, Any]
 
-    @classmethod
-    def from_dict(cls, data: dict) -> "Trace":
-        """Create Trace from Jaeger API response dict"""
-        spans = [Span.from_dict(span_data) for span_data in data.get("spans", [])]
-        return cls(
-            trace_id=data.get("traceID", ""),
-            spans=spans,
-            processes=data.get("processes", {}),
-        )
-
     def filter_spans(self, *predicates: Callable[[Span], bool]) -> list[Span]:
         """
         Filter spans using one or more predicates.

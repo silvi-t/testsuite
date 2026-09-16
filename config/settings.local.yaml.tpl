@@ -35,7 +35,6 @@
 #    url: "http://vault.example.com:8200"               # External Vault URL (auto-fetched from tools-vault namespace LoadBalancer)
 #    token: "root"                                      # Vault root token (defaults to dev mode token)
 #  tracing:
-#    backend: "jaeger"                          # Tracing backend
 #    collector_url: "rpc://jaeger-collector.com:4317"  # Tracing collector URL (may be internal)
 #    query_url: "http://jaeger-query.com"       # Tracing query URL
 #  prometheus:
