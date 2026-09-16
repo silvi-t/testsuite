@@ -47,7 +47,9 @@ def trace_200(trace_request_ids, tracing, has_ocp_managed_istio):
     """Fetches and caches the full kuadrant-filter trace for the 200 response."""
     request_id = trace_request_ids[0]
     min_procs = 3 if has_ocp_managed_istio else 4
-    traces = tracing.get_traces(service="kuadrant-filter", min_processes=min_procs, attributes={"request_id": request_id})
+    traces = tracing.get_traces(
+        service="kuadrant-filter", min_processes=min_procs, attributes={"request_id": request_id}
+    )
     assert len(traces) == 1, f"No trace was found in tracing backend with request_id: {request_id}"
     return traces[0]
 
@@ -57,7 +59,9 @@ def trace_429(trace_request_ids, tracing, has_ocp_managed_istio):
     """Fetches and caches the full kuadrant-filter trace for the 429 response."""
     request_id = trace_request_ids[1]
     min_procs = 3 if has_ocp_managed_istio else 4
-    traces = tracing.get_traces(service="kuadrant-filter", min_processes=min_procs, attributes={"request_id": request_id})
+    traces = tracing.get_traces(
+        service="kuadrant-filter", min_processes=min_procs, attributes={"request_id": request_id}
+    )
     assert len(traces) == 1, f"No trace was found in tracing backend with request_id: {request_id}"
     return traces[0]
 
@@ -70,7 +74,9 @@ def trace_401(client, tracing, has_ocp_managed_istio):
 
     request_id = response_401.headers.get("x-request-id")
     min_procs = 2 if has_ocp_managed_istio else 3
-    traces = tracing.get_traces(service="kuadrant-filter", min_processes=min_procs, attributes={"request_id": request_id})
+    traces = tracing.get_traces(
+        service="kuadrant-filter", min_processes=min_procs, attributes={"request_id": request_id}
+    )
     assert len(traces) == 1, f"No trace was found in tracing backend with request_id: {request_id}"
     return traces[0]
 
@@ -141,7 +147,9 @@ def test_spans_have_correct_policy_source_references(trace_200, action, policy, 
     policy_obj = request.getfixturevalue(policy)
     expected_sources = f"{policy_kind}.kuadrant.io:kuadrant/{policy_obj.model.metadata['name']}"
     policy_spans = trace_200.filter_spans(
-        lambda s: s.name == "grpc" and s.has_attribute("action", action) and s.has_attribute("sources", expected_sources)
+        lambda s: s.name == "grpc"
+        and s.has_attribute("action", action)
+        and s.has_attribute("sources", expected_sources)
     )
     assert len(policy_spans) > 0, f"No grpc span with action '{action}' and sources '{expected_sources}' found in trace"
 
@@ -221,8 +229,7 @@ def assert_child(trace, parent_span, child_op, **tags):
     for key, value in tags.items():
         matches = [c for c in matches if c.has_attribute(key, value)]
     assert len(matches) == 1, (
-        f"Expected exactly one '{child_op}' child of '{parent_span.name}' "
-        f"(tags={tags}), found {len(matches)}"
+        f"Expected exactly one '{child_op}' child of '{parent_span.name}' " f"(tags={tags}), found {len(matches)}"
     )
     return matches[0]
 

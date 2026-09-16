@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from typing import Any
 
-from .logs import LogEntry, _extract_otlp_value, _parse_otlp_attributes
+from .logs import LogEntry, _parse_otlp_attributes
 
 
 @dataclass(frozen=True)
@@ -13,7 +13,6 @@ class SpanReference:
     ref_type: str  # "CHILD_OF", "FOLLOWS_FROM"
     trace_id: str
     span_id: str
-
 
 
 @dataclass(frozen=True)

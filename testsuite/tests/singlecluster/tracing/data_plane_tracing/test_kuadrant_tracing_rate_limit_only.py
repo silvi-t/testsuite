@@ -45,7 +45,9 @@ def trace_429(client, tracing, has_ocp_managed_istio):
 
     request_id = response_429.headers.get("x-request-id")
     min_procs = 2 if has_ocp_managed_istio else 3
-    traces = tracing.get_traces(service="kuadrant-filter", min_processes=min_procs, attributes={"request_id": request_id})
+    traces = tracing.get_traces(
+        service="kuadrant-filter", min_processes=min_procs, attributes={"request_id": request_id}
+    )
     assert len(traces) == 1, f"No trace was found in tracing backend with request_id: {request_id}"
     return traces[0]
 

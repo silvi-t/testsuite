@@ -60,7 +60,9 @@ def test_orphaned_policy_reconciliation_traced(orphan_test_route, orphan_test_po
             trace.filter_spans(
                 lambda s: s.has_event_field("exception.type", EXPECTED_ORPHAN_EXCEPTION_TYPE)
                 and s.has_event_field("event", "exception")
-                and s.has_event_field("exception.message", f"AuthPolicy target {orphan_test_route.name()} was not found")
+                and s.has_event_field(
+                    "exception.message", f"AuthPolicy target {orphan_test_route.name()} was not found"
+                )
             )
         )
 

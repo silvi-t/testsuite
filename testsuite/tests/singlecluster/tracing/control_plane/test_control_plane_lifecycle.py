@@ -151,9 +151,7 @@ def test_policy_deletion_triggers_reconciliation_traces(temp_deletion_policy, tr
     # Verify we see effective_policies computation with non-trivial duration
     effective_policies_spans = []
     for trace in deletion_traces:
-        effective_policies_spans.extend(
-            trace.filter_spans(lambda s: s.name == "effective_policies" and s.duration > 0)
-        )
+        effective_policies_spans.extend(trace.filter_spans(lambda s: s.name == "effective_policies" and s.duration > 0))
 
     assert (
         len(effective_policies_spans) > 0
@@ -175,13 +173,17 @@ def test_multiple_policies_same_target_traced_separately(authorization, second_a
     """
     Validate traces when multiple policies target same HTTPRoute
     """
-    second_traces = tracing.get_traces(service="kuadrant-operator", attributes={"policy.name": second_auth_policy.name()})
+    second_traces = tracing.get_traces(
+        service="kuadrant-operator", attributes={"policy.name": second_auth_policy.name()}
+    )
     assert len(second_traces) > 0, f"No traces for second policy {second_auth_policy.name()}"
 
     first_uid_spans = []
     for trace in auth_traces:
         first_uid_spans.extend(
-            trace.filter_spans(lambda s: s.has_attribute("policy.name", authorization.name()) and s.has_attribute("policy.uid"))
+            trace.filter_spans(
+                lambda s: s.has_attribute("policy.name", authorization.name()) and s.has_attribute("policy.uid")
+            )
         )
 
     second_uid_spans = []

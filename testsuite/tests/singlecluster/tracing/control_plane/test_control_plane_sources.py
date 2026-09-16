@@ -88,9 +88,7 @@ def test_authconfig_span_is_child_of_reconciler(authconfig_trace):
     """
     Validate that authconfig spans are children of reconciler.auth_configs spans.
     """
-    authconfig_span = authconfig_trace.filter_spans(
-        lambda s: s.name == "authconfig" and s.has_attribute("sources")
-    )[0]
+    authconfig_span = authconfig_trace.filter_spans(lambda s: s.name == "authconfig" and s.has_attribute("sources"))[0]
 
     parent_id = authconfig_span.get_parent_id()
     assert parent_id is not None, "authconfig span has no parent"

@@ -18,8 +18,10 @@ def wasm_config_span(tracing, authorization, rate_limit, skip_or_fail):
     for trace in traces:
         spans = trace.filter_spans(
             lambda s: s.name == "wasm.BuildConfigForPath",
-            lambda s: f"authpolicy.kuadrant.io:kuadrant/{authorization.name()}" in str(s.get_attribute("source_policies")),
-            lambda s: f"ratelimitpolicy.kuadrant.io:kuadrant/{rate_limit.name()}" in str(s.get_attribute("source_policies")),
+            lambda s: f"authpolicy.kuadrant.io:kuadrant/{authorization.name()}"
+            in str(s.get_attribute("source_policies")),
+            lambda s: f"ratelimitpolicy.kuadrant.io:kuadrant/{rate_limit.name()}"
+            in str(s.get_attribute("source_policies")),
         )
         if spans:
             return {"trace": trace, "span": spans[0]}

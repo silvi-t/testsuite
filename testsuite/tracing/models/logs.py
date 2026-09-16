@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Any
 
 
-def _extract_otlp_value(attr_value: dict) -> Any:
+def _extract_otlp_value(attr_value: dict) -> Any:  # pylint: disable=too-many-return-statements
     """Extract typed value from OTLP attribute value wrapper"""
     if "stringValue" in attr_value:
         value = attr_value["stringValue"]

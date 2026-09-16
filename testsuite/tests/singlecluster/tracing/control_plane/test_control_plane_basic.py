@@ -27,14 +27,12 @@ def policy_lifecycle_trace(policy_params, tracing, skip_or_fail):
     found_trace = None
     for trace in traces:
         reconcile_spans = trace.filter_spans(
-            lambda s: s.name == "controller.reconcile"
-            and s.has_attribute("event_kinds", f"{policy_kind}.kuadrant.io")
+            lambda s: s.name == "controller.reconcile" and s.has_attribute("event_kinds", f"{policy_kind}.kuadrant.io")
         )
 
         if reconcile_spans:
             validate_spans = trace.filter_spans(
-                lambda s: s.name == f"policy.{policy_kind}.validate"
-                and s.get_attribute("policy.name") == policy.name()
+                lambda s: s.name == f"policy.{policy_kind}.validate" and s.get_attribute("policy.name") == policy.name()
             )
             status_spans = trace.filter_spans(
                 lambda s: s.name == f"policy.{policy_kind}"
@@ -226,18 +224,14 @@ def test_effective_policies_computed_before_reconcilers(
 
     # Find effective_policies.compute child
     compute_spans = [
-        s
-        for s in trace.get_children(effective_policies_span.span_id)
-        if s.name == "effective_policies.compute"
+        s for s in trace.get_children(effective_policies_span.span_id) if s.name == "effective_policies.compute"
     ]
     assert len(compute_spans) > 0, "Should have effective_policies.compute span"
     compute_span = compute_spans[0]
 
     # Get all reconciler children
     reconciler_spans = [
-        span
-        for span in trace.get_children(effective_policies_span.span_id)
-        if span.name.startswith("reconciler.")
+        span for span in trace.get_children(effective_policies_span.span_id) if span.name.startswith("reconciler.")
     ]
 
     # All reconcilers should start after compute finishes
