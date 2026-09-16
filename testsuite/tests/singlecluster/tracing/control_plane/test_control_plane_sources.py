@@ -20,7 +20,7 @@ pytestmark = [pytest.mark.observability, pytest.mark.limitador, pytest.mark.auth
 def authconfig_trace(auth_traces):
     """Find trace with authconfig span that has sources attribute"""
     for trace in auth_traces:
-        spans = trace.filter_spans(lambda s: s.operation_name == "authconfig" and s.has_tag("sources"))
+        spans = trace.filter_spans(lambda s: s.name == "authconfig" and s.has_attribute("sources"))
         if spans:
             return trace
 
@@ -32,7 +32,7 @@ def authconfig_trace(auth_traces):
 def limitador_trace(rl_traces):
     """Find trace with limitador limits span that has sources attribute"""
     for trace in rl_traces:
-        spans = trace.filter_spans(lambda s: s.operation_name == "reconciler.limitador_limits" and s.has_tag("sources"))
+        spans = trace.filter_spans(lambda s: s.name == "reconciler.limitador_limits" and s.has_attribute("sources"))
         if spans:
             return trace
 
@@ -46,18 +46,18 @@ def test_authconfig_span_attributes(authconfig_trace, authorization):
     """
     policy_ref = f"authpolicy.kuadrant.io:{authorization.namespace()}/{authorization.name()}"
     authconfig_spans = authconfig_trace.filter_spans(
-        lambda s: s.operation_name == "authconfig"
-        and s.has_tag("sources")
-        and policy_ref in (s.get_tag("sources") or [])
+        lambda s: s.name == "authconfig"
+        and s.has_attribute("sources")
+        and policy_ref in (s.get_attribute("sources") or [])
     )
     assert authconfig_spans, f"AuthPolicy {policy_ref} not found in any authconfig span sources"
     authconfig_span = authconfig_spans[0]
 
-    assert authconfig_span.has_tag("name"), "authconfig span missing 'name' attribute"
-    assert authconfig_span.has_tag("namespace"), "authconfig span missing 'namespace' attribute"
+    assert authconfig_span.has_attribute("name"), "authconfig span missing 'name' attribute"
+    assert authconfig_span.has_attribute("namespace"), "authconfig span missing 'namespace' attribute"
 
-    name = authconfig_span.get_tag("name")
-    namespace = authconfig_span.get_tag("namespace")
+    name = authconfig_span.get_attribute("name")
+    namespace = authconfig_span.get_attribute("namespace")
     assert name is not None and name != "", "authconfig name attribute is empty"
     assert namespace is not None and namespace != "", "authconfig namespace attribute is empty"
 
@@ -68,18 +68,18 @@ def test_limitador_span_attributes(limitador_trace, rate_limit):
     """
     policy_ref = f"ratelimitpolicy.kuadrant.io:{rate_limit.namespace()}/{rate_limit.name()}"
     limitador_spans = limitador_trace.filter_spans(
-        lambda s: s.operation_name == "reconciler.limitador_limits"
-        and s.has_tag("sources")
-        and policy_ref in (s.get_tag("sources") or [])
+        lambda s: s.name == "reconciler.limitador_limits"
+        and s.has_attribute("sources")
+        and policy_ref in (s.get_attribute("sources") or [])
     )
     assert limitador_spans, f"RateLimitPolicy {policy_ref} not found in any limitador span sources"
     limitador_span = limitador_spans[0]
 
-    assert limitador_span.has_tag("name"), "limitador span missing 'name' attribute"
-    assert limitador_span.has_tag("namespace"), "limitador span missing 'namespace' attribute"
+    assert limitador_span.has_attribute("name"), "limitador span missing 'name' attribute"
+    assert limitador_span.has_attribute("namespace"), "limitador span missing 'namespace' attribute"
 
-    name = limitador_span.get_tag("name")
-    namespace = limitador_span.get_tag("namespace")
+    name = limitador_span.get_attribute("name")
+    namespace = limitador_span.get_attribute("namespace")
     assert name is not None and name != "", "limitador name attribute is empty"
     assert namespace is not None and namespace != "", "limitador namespace attribute is empty"
 
@@ -89,7 +89,7 @@ def test_authconfig_span_is_child_of_reconciler(authconfig_trace):
     Validate that authconfig spans are children of reconciler.auth_configs spans.
     """
     authconfig_span = authconfig_trace.filter_spans(
-        lambda s: s.operation_name == "authconfig" and s.has_tag("sources")
+        lambda s: s.name == "authconfig" and s.has_attribute("sources")
     )[0]
 
     parent_id = authconfig_span.get_parent_id()
@@ -98,8 +98,8 @@ def test_authconfig_span_is_child_of_reconciler(authconfig_trace):
     parent_span = authconfig_trace.get_span_by_id(parent_id)
     assert parent_span is not None, f"Parent span with ID {parent_id} not found in trace"
     assert (
-        parent_span.operation_name == "reconciler.auth_configs"
-    ), f"Expected parent to be 'reconciler.auth_configs' but got '{parent_span.operation_name}'"
+        parent_span.name == "reconciler.auth_configs"
+    ), f"Expected parent to be 'reconciler.auth_configs' but got '{parent_span.name}'"
 
 
 @pytest.fixture(scope="function")
@@ -127,8 +127,8 @@ def test_authconfig_sources_contains_multiple_policies(authorization, second_aut
     all_traces = tracing.get_traces(service="kuadrant-operator")
     all_sources = set()
     for trace in all_traces:
-        for span in trace.filter_spans(lambda s: s.operation_name == "authconfig" and s.has_tag("sources")):
-            sources = span.get_tag("sources")
+        for span in trace.filter_spans(lambda s: s.name == "authconfig" and s.has_attribute("sources")):
+            sources = span.get_attribute("sources")
             if sources:
                 all_sources.update(sources)
     assert first_policy_ref in all_sources, f"First policy {first_policy_ref} not found in any authconfig span sources"
@@ -136,8 +136,8 @@ def test_authconfig_sources_contains_multiple_policies(authorization, second_aut
     scoped_traces = tracing.get_traces(service="kuadrant-operator", start_time=create_time)
     scoped_sources = set()
     for trace in scoped_traces:
-        for span in trace.filter_spans(lambda s: s.operation_name == "authconfig" and s.has_tag("sources")):
-            sources = span.get_tag("sources")
+        for span in trace.filter_spans(lambda s: s.name == "authconfig" and s.has_attribute("sources")):
+            sources = span.get_attribute("sources")
             if sources:
                 scoped_sources.update(sources)
     assert (
@@ -171,9 +171,9 @@ def test_limitador_sources_contains_multiple_policies(rate_limit, second_rate_li
     all_sources = set()
     for trace in all_traces:
         for span in trace.filter_spans(
-            lambda s: s.operation_name == "reconciler.limitador_limits" and s.has_tag("sources")
+            lambda s: s.name == "reconciler.limitador_limits" and s.has_attribute("sources")
         ):
-            sources = span.get_tag("sources")
+            sources = span.get_attribute("sources")
             if sources:
                 all_sources.update(sources)
     assert first_policy_ref in all_sources, f"First policy {first_policy_ref} not found in any limitador span sources"
@@ -182,9 +182,9 @@ def test_limitador_sources_contains_multiple_policies(rate_limit, second_rate_li
     scoped_sources = set()
     for trace in scoped_traces:
         for span in trace.filter_spans(
-            lambda s: s.operation_name == "reconciler.limitador_limits" and s.has_tag("sources")
+            lambda s: s.name == "reconciler.limitador_limits" and s.has_attribute("sources")
         ):
-            sources = span.get_tag("sources")
+            sources = span.get_attribute("sources")
             if sources:
                 scoped_sources.update(sources)
     assert (

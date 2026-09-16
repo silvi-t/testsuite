@@ -47,7 +47,7 @@ def trace_200(trace_request_ids, tracing, has_ocp_managed_istio):
     """Fetches and caches the full kuadrant-filter trace for the 200 response."""
     request_id = trace_request_ids[0]
     min_procs = 3 if has_ocp_managed_istio else 4
-    traces = tracing.get_traces(service="kuadrant-filter", min_processes=min_procs, tags={"request_id": request_id})
+    traces = tracing.get_traces(service="kuadrant-filter", min_processes=min_procs, attributes={"request_id": request_id})
     assert len(traces) == 1, f"No trace was found in tracing backend with request_id: {request_id}"
     return traces[0]
 
@@ -57,7 +57,7 @@ def trace_429(trace_request_ids, tracing, has_ocp_managed_istio):
     """Fetches and caches the full kuadrant-filter trace for the 429 response."""
     request_id = trace_request_ids[1]
     min_procs = 3 if has_ocp_managed_istio else 4
-    traces = tracing.get_traces(service="kuadrant-filter", min_processes=min_procs, tags={"request_id": request_id})
+    traces = tracing.get_traces(service="kuadrant-filter", min_processes=min_procs, attributes={"request_id": request_id})
     assert len(traces) == 1, f"No trace was found in tracing backend with request_id: {request_id}"
     return traces[0]
 
@@ -70,7 +70,7 @@ def trace_401(client, tracing, has_ocp_managed_istio):
 
     request_id = response_401.headers.get("x-request-id")
     min_procs = 2 if has_ocp_managed_istio else 3
-    traces = tracing.get_traces(service="kuadrant-filter", min_processes=min_procs, tags={"request_id": request_id})
+    traces = tracing.get_traces(service="kuadrant-filter", min_processes=min_procs, attributes={"request_id": request_id})
     assert len(traces) == 1, f"No trace was found in tracing backend with request_id: {request_id}"
     return traces[0]
 
@@ -141,7 +141,7 @@ def test_spans_have_correct_policy_source_references(trace_200, action, policy, 
     policy_obj = request.getfixturevalue(policy)
     expected_sources = f"{policy_kind}.kuadrant.io:kuadrant/{policy_obj.model.metadata['name']}"
     policy_spans = trace_200.filter_spans(
-        lambda s: s.operation_name == "grpc" and s.has_tag("action", action) and s.has_tag("sources", expected_sources)
+        lambda s: s.name == "grpc" and s.has_attribute("action", action) and s.has_attribute("sources", expected_sources)
     )
     assert len(policy_spans) > 0, f"No grpc span with action '{action}' and sources '{expected_sources}' found in trace"
 
@@ -162,7 +162,7 @@ def test_send_reply_span_on_request_rejection(expected_status_code, trace_fixtur
     """
     trace = request.getfixturevalue(trace_fixture)
     send_reply_spans = trace.filter_spans(
-        lambda s: s.operation_name == "send_reply" and s.has_tag("status_code", expected_status_code)
+        lambda s: s.name == "send_reply" and s.has_attribute("status_code", expected_status_code)
     )
     assert len(send_reply_spans) > 0, f"No send_reply span with status_code {expected_status_code} found in trace"
 
@@ -175,7 +175,7 @@ def test_send_reply_span_not_on_successful_response(trace_200):
     (e.g., 401 or 429). For successful responses that pass through all policies,
     no send_reply span should be emitted.
     """
-    send_reply_spans = trace_200.filter_spans(lambda s: s.operation_name == "send_reply")
+    send_reply_spans = trace_200.filter_spans(lambda s: s.name == "send_reply")
     assert (
         len(send_reply_spans) == 0
     ), f"Expected no send_reply spans for successful response, but found {len(send_reply_spans)}"
@@ -197,7 +197,7 @@ def test_ratelimit_limited_tag(expected_limited, trace_fixture, request):
     """
     trace = request.getfixturevalue(trace_fixture)
     srl_spans = trace.filter_spans(
-        lambda s: s.operation_name == "should_rate_limit" and s.has_tag("ratelimit.limited", expected_limited)
+        lambda s: s.name == "should_rate_limit" and s.has_attribute("ratelimit.limited", expected_limited)
     )
     assert len(srl_spans) > 0, f"No should_rate_limit span with ratelimit.limited={expected_limited} found in trace"
 
@@ -209,7 +209,7 @@ def test_ratelimit_limit_name_tag(trace_429, rate_limit):
     """
     limit_name = list(rate_limit.model.spec.limits)[0]
     srl_spans = trace_429.filter_spans(
-        lambda s: s.operation_name == "should_rate_limit" and s.has_tag("ratelimit.limit_name", limit_name)
+        lambda s: s.name == "should_rate_limit" and s.has_attribute("ratelimit.limit_name", limit_name)
     )
     assert len(srl_spans) > 0, f"No should_rate_limit span with ratelimit.limit_name='{limit_name}' found in trace"
 
@@ -217,11 +217,11 @@ def test_ratelimit_limit_name_tag(trace_429, rate_limit):
 def assert_child(trace, parent_span, child_op, **tags):
     """Assert that parent_span has a direct child with the given operation name and tags. Returns the child span."""
     children = trace.get_children(parent_span.span_id)
-    matches = [c for c in children if c.operation_name == child_op]
+    matches = [c for c in children if c.name == child_op]
     for key, value in tags.items():
-        matches = [c for c in matches if c.has_tag(key, value)]
+        matches = [c for c in matches if c.has_attribute(key, value)]
     assert len(matches) == 1, (
-        f"Expected exactly one '{child_op}' child of '{parent_span.operation_name}' "
+        f"Expected exactly one '{child_op}' child of '{parent_span.name}' "
         f"(tags={tags}), found {len(matches)}"
     )
     return matches[0]
@@ -235,7 +235,7 @@ def test_span_hierarchy(trace_200):
 
     assert len(trace_200.spans) > 0, "No spans found in trace"
 
-    kuadrant_filters = trace_200.filter_spans(lambda s: s.operation_name == "kuadrant_filter")
+    kuadrant_filters = trace_200.filter_spans(lambda s: s.name == "kuadrant_filter")
     assert kuadrant_filters, "No 'kuadrant_filter' span found in trace"
     kuadrant_filter = kuadrant_filters[0]
 

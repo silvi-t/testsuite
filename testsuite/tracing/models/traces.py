@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from typing import Any, Callable
 
+from .logs import _parse_otlp_attributes
 from .spans import Span
 
 
@@ -44,23 +45,23 @@ class Trace:
 
         Examples:
             # Single condition
-            trace.filter_spans(lambda s: s.operation_name == "controller.reconcile")
+            trace.filter_spans(lambda s: s.name == "controller.reconcile")
 
             # Multiple conditions (AND)
             trace.filter_spans(
-                lambda s: s.operation_name.startswith("reconciler."),
+                lambda s: s.name.startswith("reconciler."),
                 lambda s: s.duration > 50
             )
 
             # Complex single predicate
             trace.filter_spans(
-                lambda s: s.duration > 50 and "wasm" in s.operation_name
+                lambda s: s.duration > 50 and "wasm" in s.name
             )
 
             # Use any Span property
             trace.filter_spans(
-                lambda s: s.has_tag("policy.kind", "AuthPolicy"),
-                lambda s: len(s.logs) > 0,
+                lambda s: s.has_attribute("policy.kind", "AuthPolicy"),
+                lambda s: len(s.events) > 0,
                 lambda s: s.get_parent_id() is not None
             )
         """
@@ -83,3 +84,37 @@ class Trace:
     def get_children(self, span_id: str) -> list[Span]:
         """Get all direct child spans of the given span"""
         return [span for span in self.spans if span.get_parent_id() == span_id]
+
+    @classmethod
+    def from_otlp(cls, resource_spans: list[dict]) -> list["Trace"]:
+        """Create list of Traces from OTLP resourceSpans"""
+        traces: dict[str, dict] = {}
+
+        for rs in resource_spans:
+            resource_attrs = _parse_otlp_attributes(rs.get("resource", {}).get("attributes", []))
+            service_name = str(resource_attrs.get("service.name", ""))
+
+            for scope_span in rs.get("scopeSpans", []):
+                for span_data in scope_span.get("spans", []):
+                    trace_id = span_data.get("traceId", "")
+                    if trace_id not in traces:
+                        traces[trace_id] = {"spans": [], "processes": {}, "counter": 0}
+
+                    trace = traces[trace_id]
+
+                    process_id = None
+                    for pid, proc in trace["processes"].items():
+                        if proc["attributes"] == resource_attrs:
+                            process_id = pid
+                            break
+                    if process_id is None:
+                        trace["counter"] += 1
+                        process_id = f"p{trace['counter']}"
+                        trace["processes"][process_id] = {
+                            "serviceName": service_name,
+                            "attributes": resource_attrs,
+                        }
+
+                    trace["spans"].append(Span.from_otlp(span_data, trace_id, process_id))
+
+        return [cls(trace_id=tid, spans=t["spans"], processes=t["processes"]) for tid, t in traces.items()]
