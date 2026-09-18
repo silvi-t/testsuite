@@ -56,7 +56,7 @@ def auth_traces(authorization, tracing, skip_or_fail) -> list[Trace]:
     """
     policy_name = authorization.name()
     query_tags = {"policy.name": policy_name}
-    traces = tracing.get_traces(service="kuadrant-operator", tags=query_tags)
+    traces = tracing.get_traces(service="kuadrant-operator", attributes=query_tags)
     if not traces:
         skip_or_fail(
             f"No traces found for AuthPolicy '{policy_name}'. "
@@ -73,7 +73,7 @@ def rl_traces(rate_limit, tracing, skip_or_fail) -> list[Trace]:
     """
     policy_name = rate_limit.name()
     query_tags = {"policy.name": policy_name}
-    traces = tracing.get_traces(service="kuadrant-operator", tags=query_tags)
+    traces = tracing.get_traces(service="kuadrant-operator", attributes=query_tags)
     if not traces:
         skip_or_fail(
             f"No traces found for RateLimitPolicy '{policy_name}'. "

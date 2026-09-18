@@ -46,7 +46,6 @@ settings = Dynaconf(
             Validator("service_protection.authorino.auth_url", must_exist=True)
             & Validator("service_protection.authorino.oidc_url", must_exist=True)
         ),
-        DefaultValueValidator("tracing.backend", default="jaeger", is_in=["jaeger", "tempo"]),
         DefaultValueValidator(
             "tracing.collector_url", default=fetch_service("jaeger-collector", protocol="rpc", port=OTEL_COLLECTOR_PORT)
         ),

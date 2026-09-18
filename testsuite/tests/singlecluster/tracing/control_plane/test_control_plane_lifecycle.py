@@ -22,7 +22,7 @@ pytestmark = [pytest.mark.observability, pytest.mark.limitador, pytest.mark.auth
 @pytest.fixture(scope="module")
 def trace_snapshot_before_update(authorization, tracing):
     """Snapshot of trace and span IDs before policy update"""
-    traces = tracing.get_traces(service="kuadrant-operator", tags={"policy.name": authorization.name()})
+    traces = tracing.get_traces(service="kuadrant-operator", attributes={"policy.name": authorization.name()})
     trace_ids = {trace.trace_id for trace in traces}
     span_ids = {span.span_id for trace in traces for span in trace.spans}
     return {"trace_ids": trace_ids, "span_ids": span_ids}
@@ -55,13 +55,13 @@ def test_policy_update_generates_new_reconciliation_trace(updated_authorization,
     # Query for traces that started after the update timestamp
     # The backoff decorator will retry until at least one trace appears
     updated_traces = tracing.get_traces(
-        service="kuadrant-operator", tags={"policy.name": authorization.name()}, start_time=update_time
+        service="kuadrant-operator", attributes={"policy.name": authorization.name()}, start_time=update_time
     )
 
     # Find new reconcile spans (spans that weren't in the original snapshot)
     new_reconcile_spans = []
     for trace in updated_traces:
-        for span in trace.filter_spans(lambda s: s.operation_name == "controller.reconcile"):
+        for span in trace.filter_spans(lambda s: s.name == "controller.reconcile"):
             if span.span_id not in snapshot["span_ids"]:
                 new_reconcile_spans.append(span)
 
@@ -70,7 +70,7 @@ def test_policy_update_generates_new_reconciliation_trace(updated_authorization,
     # Find new policy spans (spans that weren't in the original snapshot)
     new_policy_spans = []
     for trace in updated_traces:
-        for span in trace.filter_spans(lambda s: s.get_tag("policy.name") == authorization.name()):
+        for span in trace.filter_spans(lambda s: s.get_attribute("policy.name") == authorization.name()):
             if span.span_id not in snapshot["span_ids"]:
                 new_policy_spans.append(span)
 
@@ -124,8 +124,8 @@ def test_policy_deletion_triggers_reconciliation_traces(temp_deletion_policy, tr
         new_reconcile_spans = [
             s
             for s in trace.filter_spans(
-                lambda s: s.operation_name == "controller.reconcile"
-                and s.has_tag("event_kinds", f"{policy_kind}.kuadrant.io")
+                lambda s: s.name == "controller.reconcile"
+                and s.has_attribute("event_kinds", f"{policy_kind}.kuadrant.io")
             )
             if s.span_id not in span_ids_before
         ]
@@ -141,7 +141,7 @@ def test_policy_deletion_triggers_reconciliation_traces(temp_deletion_policy, tr
     data_plane_workflow = []
     for trace in deletion_traces:
         data_plane_workflow.extend(
-            trace.filter_spans(lambda s: s.operation_name == "workflow.data_plane_policies" and s.duration > 0)
+            trace.filter_spans(lambda s: s.name == "workflow.data_plane_policies" and s.duration > 0)
         )
 
     assert (
@@ -151,9 +151,7 @@ def test_policy_deletion_triggers_reconciliation_traces(temp_deletion_policy, tr
     # Verify we see effective_policies computation with non-trivial duration
     effective_policies_spans = []
     for trace in deletion_traces:
-        effective_policies_spans.extend(
-            trace.filter_spans(lambda s: s.operation_name == "effective_policies" and s.duration > 0)
-        )
+        effective_policies_spans.extend(trace.filter_spans(lambda s: s.name == "effective_policies" and s.duration > 0))
 
     assert (
         len(effective_policies_spans) > 0
@@ -175,28 +173,32 @@ def test_multiple_policies_same_target_traced_separately(authorization, second_a
     """
     Validate traces when multiple policies target same HTTPRoute
     """
-    second_traces = tracing.get_traces(service="kuadrant-operator", tags={"policy.name": second_auth_policy.name()})
+    second_traces = tracing.get_traces(
+        service="kuadrant-operator", attributes={"policy.name": second_auth_policy.name()}
+    )
     assert len(second_traces) > 0, f"No traces for second policy {second_auth_policy.name()}"
 
     first_uid_spans = []
     for trace in auth_traces:
         first_uid_spans.extend(
-            trace.filter_spans(lambda s: s.has_tag("policy.name", authorization.name()) and s.has_tag("policy.uid"))
+            trace.filter_spans(
+                lambda s: s.has_attribute("policy.name", authorization.name()) and s.has_attribute("policy.uid")
+            )
         )
 
     second_uid_spans = []
     for trace in second_traces:
         second_uid_spans.extend(
             trace.filter_spans(
-                lambda s: s.has_tag("policy.name", second_auth_policy.name()) and s.has_tag("policy.uid")
+                lambda s: s.has_attribute("policy.name", second_auth_policy.name()) and s.has_attribute("policy.uid")
             )
         )
 
     assert len(first_uid_spans) > 0, "Could not find policy.uid for first policy"
     assert len(second_uid_spans) > 0, "Could not find policy.uid for second policy"
 
-    first_uid = first_uid_spans[0].get_tag("policy.uid")
-    second_uid = second_uid_spans[0].get_tag("policy.uid")
+    first_uid = first_uid_spans[0].get_attribute("policy.uid")
+    second_uid = second_uid_spans[0].get_attribute("policy.uid")
 
     assert first_uid != second_uid, "Both policies should have distinct UIDs in traces"
 
@@ -215,7 +217,7 @@ def second_route(request, cluster, blame, gateway, module_label, backend):
 @pytest.fixture(scope="function")
 def trace_snapshot_before_target_change(authorization, tracing):
     """Snapshot of trace and span IDs before policy target change"""
-    traces = tracing.get_traces(service="kuadrant-operator", tags={"policy.name": authorization.name()})
+    traces = tracing.get_traces(service="kuadrant-operator", attributes={"policy.name": authorization.name()})
     span_ids = {span.span_id for trace in traces for span in trace.spans}
     return span_ids
 
@@ -247,13 +249,13 @@ def test_policy_target_change_traced(authorization_with_changed_target, trace_sn
     # Query for traces that started after the target change timestamp
     # The backoff decorator will retry until at least one trace appears
     updated_traces = tracing.get_traces(
-        service="kuadrant-operator", tags={"policy.name": authorization.name()}, start_time=change_time
+        service="kuadrant-operator", attributes={"policy.name": authorization.name()}, start_time=change_time
     )
 
     # Find new reconcile spans (spans that weren't in the original snapshot)
     new_reconcile_spans = []
     for trace in updated_traces:
-        for span in trace.filter_spans(lambda s: s.operation_name == "controller.reconcile"):
+        for span in trace.filter_spans(lambda s: s.name == "controller.reconcile"):
             if span.span_id not in snapshot:
                 new_reconcile_spans.append(span)
 

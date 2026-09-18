@@ -50,7 +50,7 @@ def test_orphaned_policy_reconciliation_traced(orphan_test_route, orphan_test_po
 
     # Look for traces with error indicators or warnings
     policy_traces = tracing.get_traces(
-        service="kuadrant-operator", tags={"policy.name": orphan_test_policy.name(), "error": "true"}
+        service="kuadrant-operator", attributes={"policy.name": orphan_test_policy.name(), "error": "true"}
     )
 
     # Check if any spans indicate problems (error status or exception in logs)
@@ -58,9 +58,11 @@ def test_orphaned_policy_reconciliation_traced(orphan_test_route, orphan_test_po
     for trace in policy_traces:
         error_spans.extend(
             trace.filter_spans(
-                lambda s: s.has_log_field("exception.type", EXPECTED_ORPHAN_EXCEPTION_TYPE)
-                and s.has_log_field("event", "exception")
-                and s.has_log_field("exception.message", f"AuthPolicy target {orphan_test_route.name()} was not found")
+                lambda s: s.has_event_field("exception.type", EXPECTED_ORPHAN_EXCEPTION_TYPE)
+                and s.has_event_field("event", "exception")
+                and s.has_event_field(
+                    "exception.message", f"AuthPolicy target {orphan_test_route.name()} was not found"
+                )
             )
         )
 

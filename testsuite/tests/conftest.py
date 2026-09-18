@@ -22,7 +22,6 @@ from testsuite.oidc.auth0 import Auth0Provider
 from testsuite.prometheus import Prometheus
 from testsuite.oidc.keycloak import Keycloak
 from testsuite.tracing.jaeger import JaegerClient
-from testsuite.tracing.tempo import RemoteTempoClient
 from testsuite.utils import randomize, _whoami
 
 
@@ -319,10 +318,9 @@ def tracing(testconfig, skip_or_fail):
     except (KeyError, ValidationError) as exc:
         skip_or_fail(f"Tracing configuration item is missing: {exc}")
 
-    cls = JaegerClient if testconfig["tracing"]["backend"] == "jaeger" else RemoteTempoClient
     # Authorino needs to have verify disabled because it doesn't trust local service URLs
     with KuadrantClient(verify=False) as client:
-        yield cls(
+        yield JaegerClient(
             testconfig["tracing"]["collector_url"],
             testconfig["tracing"]["query_url"],
             client,

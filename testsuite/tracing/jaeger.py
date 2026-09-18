@@ -1,6 +1,6 @@
 """Jaeger Tracing client"""
 
-import json
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import backoff
@@ -37,32 +37,52 @@ class JaegerClient(TracingClient):
     def get_traces(
         self,
         service: str,
-        tags: Optional[dict[str, str]] = None,
+        attributes: Optional[dict[str, str]] = None,
         min_processes: int = 0,
         start_time: Optional[int] = None,
     ) -> list[Trace]:
-        """Gets trace from tracing backend Tempo or Jaeger.
+        """Gets traces from Jaeger v3 API.
         If min_processes is set, retries until at least that many service processes are present.
         If start_time is set, only returns traces that started after that time (in microseconds).
 
         Returns:
             List of Trace objects
         """
-        params = {"service": service}
-        if tags:
-            params["tags"] = json.dumps(tags)
+        now = datetime.now(timezone.utc)
         if start_time is not None:
-            params["start"] = str(start_time)
+            start_dt = datetime.fromtimestamp(start_time / 1_000_000, tz=timezone.utc)
+        else:
+            start_dt = now - timedelta(hours=1)
 
-        traces_data = self.query.api.traces.get(params=params).json()["data"]
-        if not traces_data:
+        params = {
+            "query.service_name": service,
+            "query.start_time_min": start_dt.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "query.start_time_max": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        }
+
+        response = self.query.api.v3.traces.get(params=params).json()
+        resource_spans = response.get("result", {}).get("resourceSpans", [])
+        if not resource_spans:
             return []
 
-        # Filter traces that meet min_processes requirement
-        if min_processes:
-            traces_data = [trace for trace in traces_data if len(trace.get("processes", {})) >= min_processes]
-            if not traces_data:
-                return []
+        traces = Trace.from_otlp(resource_spans)
 
-        # Convert to Trace objects
-        return [Trace.from_dict(trace_data) for trace_data in traces_data]
+        if attributes:
+            traces = [t for t in traces if self._trace_matches_attributes(t, attributes)]
+
+        if min_processes:
+            traces = [t for t in traces if len(t.processes) >= min_processes]
+
+        return traces
+
+    @staticmethod
+    def _trace_matches_attributes(trace: Trace, attributes: dict[str, str]) -> bool:
+        """Check if any span in the trace has all the requested attributes.
+        Also checks resource-level attributes from the span's own process."""
+        for span in trace.spans:
+            process_attrs = trace.processes.get(span.process_id, {}).get("attributes", {})
+            if all(
+                span.has_attribute(key, value) or process_attrs.get(key) == value for key, value in attributes.items()
+            ):
+                return True
+        return False
